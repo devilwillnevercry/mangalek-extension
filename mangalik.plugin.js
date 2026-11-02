@@ -1,13 +1,29 @@
 // Harbor manga source plugin: Mangalik / مانجا ليك (mangalik.net)
 // Madara WordPress theme. Built on the pattern of a working Madara plugin.
 // Selectors are Madara defaults and are NOT yet verified on the live site.
+// NOTE: if mangalik.net uses a JavaScript bot check, no plugin can pass it.
 
 const BASE = "https://mangalik.net";
 // Items per listing page. If browsing skips or repeats items, change this.
 const PAGE_SIZE = 21;
 
+// Browser-like headers so the site sees a normal visitor.
+const HEADERS = {
+  "User-Agent":
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+  "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+  "Accept-Language": "ar,en-US;q=0.8,en;q=0.6",
+  "Referer": BASE + "/",
+};
+
 async function getDoc(path) {
-  const res = await harbor.http(BASE + path, { responseType: "text" });
+  let res;
+  try {
+    res = await harbor.http(BASE + path, { responseType: "text", headers: HEADERS });
+  } catch (e) {
+    // Some builds reject custom headers: retry plain.
+    res = await harbor.http(BASE + path, { responseType: "text" });
+  }
   if (!res.ok) throw new Error("http " + res.status + " for " + path);
   return harbor.parseHtml(res.body);
 }
@@ -21,10 +37,11 @@ async function postDoc(path, body) {
       method: "POST",
       body: body,
       responseType: "text",
-      headers: {
+      headers: Object.assign({}, HEADERS, {
         "Content-Type": "application/x-www-form-urlencoded",
         "X-Requested-With": "XMLHttpRequest",
-      },
+        "Origin": BASE,
+      }),
     },
     { method: "POST", body: body, responseType: "text" },
     { method: "POST", data: body, responseType: "text" },
@@ -90,7 +107,7 @@ function cardToSummary(el) {
 const plugin = {
   id: "mangalik",
   name: "Mangalik",
-  version: "1.0.1",
+  version: "1.0.2",
 
   async popular(offset, tagId) {
     const page = Math.floor(offset / PAGE_SIZE) + 1;
